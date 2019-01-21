@@ -3,7 +3,7 @@ package com.example.imageloader;
 import android.graphics.Bitmap;
 import android.util.LruCache;
 
-class MemCacheManager {
+class MemCacheManager extends BaseCacheManager{
     private LruCache<String, Bitmap> memCache;
 
     MemCacheManager() {
@@ -17,13 +17,13 @@ class MemCacheManager {
         };
     }
 
-    void putBitmapIntoCache(String uri, Bitmap bitmap, int sampleSize) {
+    void putBitmap(String uri, Bitmap bitmap, int sampleSize) {
         String key = String.valueOf(uri.hashCode() + sampleSize);
         if (memCache.get(key) == null)
             memCache.put(key, bitmap);
     }
 
-    Bitmap getBitmapFromMemory(String uri, int sampleSize) {
+    Bitmap getBitmap(String uri, int sampleSize) {
         String key = String.valueOf(uri.hashCode() + sampleSize);
         return memCache.get(key);
     }

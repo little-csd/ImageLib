@@ -12,7 +12,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 // TODO: 1/19/19 change disk manager to lru
-class DiskCacheManager {
+class DiskCacheManager extends BaseCacheManager{
 
     private static final String TAG = "DiskCacheManager";
     private String diskCacheDir;
@@ -31,15 +31,15 @@ class DiskCacheManager {
             Log.i(TAG, "DiskCacheManager: " + diskCacheDir);
     }
 
-    void putBitmapIntoDisk(String uri, Bitmap bitmap) {
+    void putBitmap(String uri, Bitmap bitmap, int sampleSize) {
         if (diskCacheDir == null) {
-            Log.i(TAG, "putBitmapIntoDisk: error! diskCacheDir is null");
+            Log.i(TAG, "putBitmap: error! diskCacheDir is null");
             return;
         }
-        String dst = diskCacheDir + String.valueOf(uri.hashCode()) + ".jpg";
+        String dst = diskCacheDir + String.valueOf(uri.hashCode() + sampleSize) + ".jpg";
         File file = new File(dst);
         if (file.exists()) {
-            Log.i(TAG, "putBitmapIntoDisk: file has existed: " + uri);
+            Log.i(TAG, "putBitmap: file has existed: " + uri);
             return;
         }
         try {
@@ -48,33 +48,14 @@ class DiskCacheManager {
             os.flush();
             os.close();
         } catch (IOException e) {
-            Log.i(TAG, "putBitmapIntoDisk: " + e);
+            Log.i(TAG, "putBitmap: " + e);
         }
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString(uri, dst);
         editor.apply();
     }
 
-    Bitmap getBitmapFromDisk(String uri) {
-        String dst = prefs.getString(uri, null);
-        if (dst == null) return null;
-
-        File file = new File(dst);
-        if (!file.exists()) {
-            Log.i(TAG, "getBitmapFromDisk: error! File is not exist");
-            return null;
-        }
-        Bitmap bitmap = null;
-        try {
-            FileInputStream in = new FileInputStream(file);
-            bitmap = BitmapFactory.decodeStream(in);
-        } catch (IOException e) {
-            Log.i(TAG, "getBitmapFromDisk: " + e);
-        }
-        return bitmap;
-    }
-
-    Bitmap getBitmapFromDisk(String uri, int sampleSize) {
+    Bitmap getBitmap(String uri, int sampleSize) {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inSampleSize = sampleSize;
 
@@ -82,7 +63,7 @@ class DiskCacheManager {
         if (dst == null) return null;
         File file = new File(dst);
         if (!file.exists()) {
-            Log.i(TAG, "getBitmapFromDisk: error! File is not exist");
+            Log.i(TAG, "getBitmap: error! File is not exist");
             return null;
         }
         return BitmapFactory.decodeFile(dst, options);

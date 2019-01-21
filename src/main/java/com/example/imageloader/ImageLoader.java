@@ -30,6 +30,11 @@ public class ImageLoader {
     private static final int CORE_POOL_SIZE = CPU_COUNT + 1;
     private static final int MAXIMUM_POOL_SIZE = CPU_COUNT * 2;
     private static final long ALIVE_TIME = 10L;
+    private static final int MAX_MANAGER = 3;
+
+    enum Priority {
+        BEFORE_MEMORY, BEFORE_DISK, BEFORE_NETWORK
+    }
 
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
         private final AtomicInteger mCount = new AtomicInteger(1);
@@ -51,9 +56,10 @@ public class ImageLoader {
     );
     private static ImageLoader loader = null;
     private MemCacheManager memCacheManager;
-    //private DiskCacheManager diskCacheManager;
+    private DiskCacheManager diskCacheManager;
     private NetworkManager networkManager;
     private BitmapAdjust bitmapAdjust;
+    private BaseCacheManager[] baseCacheManager;
     @SuppressLint("HandlerLeak")
     private Handler mainHandler = new Handler() {
         @Override
@@ -78,6 +84,7 @@ public class ImageLoader {
         diskCacheManager = new DiskCacheManager(diskCacheDir, prefs);
         networkManager = new NetworkManager();
         bitmapAdjust = new BitmapAdjust();
+        baseCacheManager = new BaseCacheManager[MAX_MANAGER];
     }
 
     public static ImageLoader with(Context context) {
@@ -138,30 +145,48 @@ public class ImageLoader {
             throw new RuntimeException("You should not load bitmap in UI Thread");
 
         int sampleSize = diskCacheManager.getSampleSize(uri, reqWidth, reqHeight);
-        Bitmap bitmap = memCacheManager.getBitmapFromMemory(uri, sampleSize);
+        Bitmap bitmap = memCacheManager.getBitmap(uri, sampleSize);
         if (bitmap != null) {
             Log.d(TAG, "loadBitmap: load bitmap from memory cache succeed.");
             return bitmap;
         }
 
-        bitmap = diskCacheManager.getBitmapFromDisk(uri, sampleSize);
+        bitmap = diskCacheManager.getBitmap(uri, sampleSize);
         if (bitmap != null) {
             Log.d(TAG, "loadBitmap: load bitmap from disk cache succeed.");
-            memCacheManager.putBitmapIntoCache(uri, bitmap, sampleSize);
+            memCacheManager.putBitmap(uri, bitmap, sampleSize);
             return bitmap;
         }
 
         bitmap = networkManager.getBitmapFromNetwork(uri);
         if (bitmap != null) {
             Log.d(TAG, "loadBitmap: load bitmap from network succeed.");
-            diskCacheManager.putBitmapIntoDisk(uri, bitmap);
+            diskCacheManager.putBitmap(uri, bitmap, 1);
             sampleSize = diskCacheManager.getSampleSize(uri, reqWidth, reqHeight);
-            memCacheManager.putBitmapIntoCache(uri, bitmap, sampleSize);
+            memCacheManager.putBitmap(uri, bitmap, sampleSize);
             return bitmap;
         }
 
         Log.d(TAG, "loadBitmap: load bitmap failure of Uri: " + uri);
         return null;
+    }
+
+    // TODO: 1/21/19 add this custom CacheManager 
+    /**
+     * You can add your own CacheManager through this method.
+     * You can not add a manager in a same position.
+     * Or it will throw an IllegalArgumentException.
+     * @param manager the manager wait to be added
+     * @param priority the priority decide the order we get from the managers
+     */
+    private void addCacheManager(BaseCacheManager manager, Priority priority) {
+        int pos;
+        if (priority == Priority.BEFORE_MEMORY) pos = 0;
+        else if (priority == Priority.BEFORE_DISK) pos = 1;
+        else pos = 2;
+        if (baseCacheManager[pos] != null)
+            throw new IllegalArgumentException("You can not add a manager in a same position");
+        baseCacheManager[pos] = manager;
     }
 
     /**
